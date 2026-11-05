@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script src="https://class-data.questx-classroom.workers.dev/questx-data.js" data-site="nismonine.github.io"></script></head><body>
 <title>Safari Smarts</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -333,6 +333,20 @@ body[data-screen=lesson] #subs { bottom: auto; top: calc(env(safe-area-inset-top
 }
 @media (min-width: 700px) { .stkgrid { grid-template-columns: repeat(4, 1fr); } .opt { min-height: 88px; } }
 
+
+/* ---------- guestbook ---------- */
+.guestbook { margin: 28px 0 24px; display: grid; gap: 12px; text-align: left; }
+.guestbook h2 { margin-bottom: 2px; }
+.guestbook-form { display: grid; gap: 10px; }
+.guestbook-form label { display: grid; gap: 5px; font: 800 16px var(--f-display); }
+.guestbook-form .textin { font-size: 19px; }
+.guestbook-form textarea.textin { min-height: 100px; resize: vertical; font: 600 17px/1.4 var(--f-body); }
+.guestbook-notes { display: grid; gap: 10px; }
+.guestbook-note { background: #FFFBEA; border: 2px solid var(--ink); border-radius: 15px; padding: 10px 12px; overflow-wrap: anywhere; }
+.guestbook-note b { display: block; font: 800 18px var(--f-display); margin-bottom: 3px; }
+.guestbook-note p { white-space: pre-wrap; }
+.guestbook-status { color: var(--ink2); font-size: 14px; }
+.guestbook-status.error { color: var(--clay-d); font-weight: 700; }
 </style>
 <div id="bg" aria-hidden="true"><div class="cloud c1"></div><div class="cloud c2"></div><div class="hills"></div></div>
 <div id="app"></div>
@@ -2019,6 +2033,72 @@ function langToggle() {
   return `<div class="langtog" role="group" aria-label="Language"><button data-act="setLang" data-l="en" class="${LANG === 'en' ? 'on' : ''}">EN</button><button data-act="setLang" data-l="sw" class="${LANG === 'sw' ? 'on' : ''}">SW</button></div>`;
 }
 ACT.setLang = (el) => { setLang(el.dataset.l); if (S.screen === 'create') { S.draft.lang = el.dataset.l; } render(); };
+/* ---------- public guestbook ---------- */
+async function loadGuestbook() {
+  const notesEl = document.getElementById('guestbookNotes');
+  const statusEl = document.getElementById('guestbookStatus');
+  if (!notesEl || !statusEl) return;
+  statusEl.textContent = 'Loading notes…';
+  statusEl.classList.remove('error');
+  try {
+    const notes = await QuestXData.list('guestbook', 20);
+    notesEl.replaceChildren();
+    if (!Array.isArray(notes) || notes.length === 0) {
+      statusEl.textContent = 'No notes yet. Be the first to leave one!';
+      return;
+    }
+    notes.slice(0, 20).forEach((note) => {
+      const article = document.createElement('article');
+      article.className = 'guestbook-note';
+      const name = document.createElement('b');
+      name.textContent = String(note && note.data && note.data.name || 'Guest');
+      const message = document.createElement('p');
+      message.textContent = String(note && note.data && note.data.message || '');
+      article.append(name, message);
+      notesEl.appendChild(article);
+    });
+    statusEl.textContent = 'Showing the 20 newest notes.';
+  } catch (error) {
+    statusEl.textContent = error && error.message ? error.message : 'Could not load guestbook notes. Please try again.';
+    statusEl.classList.add('error');
+  }
+}
+
+document.addEventListener('submit', async (event) => {
+  if (event.target.id !== 'guestbookForm') return;
+  event.preventDefault();
+  const form = event.target;
+  const nameInput = document.getElementById('guestbookName');
+  const messageInput = document.getElementById('guestbookMessage');
+  const saveButton = document.getElementById('guestbookSave');
+  const statusEl = document.getElementById('guestbookStatus');
+  const name = nameInput.value.trim().slice(0, 40);
+  const message = messageInput.value.trim().slice(0, 300);
+  statusEl.classList.remove('error');
+
+  if (!name || !message) {
+    statusEl.textContent = 'Please enter your first name and a short message.';
+    statusEl.classList.add('error');
+    return;
+  }
+
+  saveButton.disabled = true;
+  saveButton.textContent = 'Saving…';
+  statusEl.textContent = 'Saving your note…';
+  try {
+    await QuestXData.save('guestbook', { name, message });
+    form.reset();
+    await loadGuestbook();
+    statusEl.textContent = 'Your note was saved!';
+  } catch (error) {
+    statusEl.textContent = error && error.message ? error.message : 'Could not save your note. Please try again.';
+    statusEl.classList.add('error');
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = 'Save note';
+  }
+});
+
 SCREENS.profiles = () => {
   const cards = DB.order.map(id => {
     const p = DB.profiles[id]; const sn = streakNow(p);
@@ -2029,8 +2109,21 @@ SCREENS.profiles = () => {
   <div class="brandbar"><div class="brand">${logoSVG()}<div><h1>${t('appName')}</h1><p>${t('tagline')}</p></div></div>${langToggle()}</div>
   <h2 class="who">${DB.order.length ? t('who') : t('welcomeFirst')}</h2>
   <div class="pgrid">${cards}${add}</div>
-  <div class="pfoot">${btn('openParent', icon('lock') + ' ' + t('grownups'), 'btn-ghost sm')}</div></div>`;
+  <div class="pfoot">${btn('openParent', icon('lock') + ' ' + t('grownups'), 'btn-ghost sm')}</div>
+  <section class="guestbook card" aria-labelledby="guestbookTitle">
+    <div><h2 id="guestbookTitle">Guestbook</h2><p class="sub">Leave a note for the Safari Smarts community!</p></div>
+    <form class="guestbook-form" id="guestbookForm" novalidate>
+      <label for="guestbookName">First name</label>
+      <input class="textin" id="guestbookName" name="name" type="text" maxlength="40" autocomplete="given-name" required>
+      <label for="guestbookMessage">Short message</label>
+      <textarea class="textin" id="guestbookMessage" name="message" maxlength="300" required></textarea>
+      <button class="btn btn-leaf" id="guestbookSave" type="submit">Save note</button>
+    </form>
+    <p class="guestbook-status" id="guestbookStatus" role="status" aria-live="polite">Loading notes…</p>
+    <div><h3>Latest notes</h3><div class="guestbook-notes" id="guestbookNotes"></div></div>
+  </section></div>`;
 };
+MOUNT.profiles = loadGuestbook;
 I18N.welcomeFirst = { en: 'Hello! Add your first learner.', sw: 'Karibu! Ongeza mwanafunzi wa kwanza.' };
 ACT.pickProfile = (el) => { setActive(el.dataset.id); sfx('tap'); go('home'); };
 ACT.newChild = () => { S.draft = { name: '', age: 6, buddy: 'simba', teacher: 'twiga', lang: LANG }; go('create', { step: 1 }); };
